@@ -45,11 +45,39 @@ def gosu_url
   gosu_assets.find { |asset| asset['browser_download_url'] =~ /gosu-amd64$/ }['browser_download_url']
 end
 
+
+install_gosu = [
+	"ADD #{gosu_url} /usr/local/sbin/gosu",
+	'RUN chmod 755 /usr/local/sbin/gosu'
+]
+install_tini = [
+	"ADD #{tini_url} /usr/local/sbin/tini",
+	'RUN chmod 755 /usr/local/sbin/tini',
+	'RUN alias tini="/usr/local/sbin/tini"'
+]
+create_user_and_group = [
+	'RUN groupadd -g ${GID} go && useradd -u ${UID} -g go go'
+]
+
 [
+  {
+    distro: 'alpine',
+	# edge is required for easy install of tini and jdk8
+    version: 'edge',
+	docker_commands: [
+		'RUN adduser -u ${UID} -g ${GID} -D go'
+	],
+    install_packages: [
+	  "apk --update --no-cache add tini openjdk8 curl git subversion mercurial openssh-client bash unzip",
+	  # gosu is in testing fase and is only available in the testing repository
+	  "apk --no-cache add gosu --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --allow-untrusted"
+    ]
+  },
   {
     distro: 'debian',
     version: '7',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       "echo 'deb http://ppa.launchpad.net/webupd8team/java/ubuntu xenial main' > /etc/apt/sources.list.d/webupd8team-java.list",
       'apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886',
       'apt-get update',
@@ -61,7 +89,8 @@ end
   {
     distro: 'debian',
     version: '8',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       "echo 'deb http://ppa.launchpad.net/webupd8team/java/ubuntu xenial main' > /etc/apt/sources.list.d/webupd8team-java.list",
       'apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886',
       'apt-get update',
@@ -73,7 +102,8 @@ end
   {
     distro: 'ubuntu',
     version: '12.04',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       "echo deb 'http://ppa.launchpad.net/openjdk-r/ppa/ubuntu precise main' > /etc/apt/sources.list.d/openjdk-ppa.list",
       'apt-key adv --keyserver keyserver.ubuntu.com --recv-keys DA1A4A13543B466853BAF164EB9B1D8886F44E2A',
       'apt-get update',
@@ -86,7 +116,8 @@ end
   {
     distro: 'ubuntu',
     version: '14.04',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       "echo deb 'http://ppa.launchpad.net/openjdk-r/ppa/ubuntu trusty main' > /etc/apt/sources.list.d/openjdk-ppa.list",
       'apt-key adv --keyserver keyserver.ubuntu.com --recv-keys DA1A4A13543B466853BAF164EB9B1D8886F44E2A',
       'apt-get update',
@@ -99,7 +130,8 @@ end
   {
     distro: 'ubuntu',
     version: '16.04',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       "echo deb 'http://ppa.launchpad.net/openjdk-r/ppa/ubuntu xenial main' > /etc/apt/sources.list.d/openjdk-ppa.list",
       'apt-key adv --keyserver keyserver.ubuntu.com --recv-keys DA1A4A13543B466853BAF164EB9B1D8886F44E2A',
       'apt-get update',
@@ -110,7 +142,8 @@ end
   {
     distro: 'centos',
     version: '6',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       'yum update -y',
       'yum install -y java-1.8.0-openjdk-headless git mercurial subversion openssh-clients bash unzip',
       'yum clean all'
@@ -119,7 +152,8 @@ end
   {
     distro: 'centos',
     version: '7',
-    before_install: [
+	docker_commands: [].concat(install_gosu, install_tini, create_user_and_group),
+    install_packages: [
       'yum update -y',
       'yum install -y java-1.8.0-openjdk-headless git mercurial subversion openssh-clients bash unzip',
       'yum clean all'
@@ -128,7 +162,8 @@ end
 ].each do |image|
   distro = image[:distro]
   version = image[:version]
-  before_install = image[:before_install]
+  install_packages = image[:install_packages]
+  docker_commands = image[:docker_commands]
 
   image_name = "gocd-agent-#{distro}-#{version}"
   repo_name = "docker-#{image_name}"
